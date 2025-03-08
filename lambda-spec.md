@@ -310,3 +310,204 @@ $ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec.md
 
 At this point you should have the files `lang-conf.edn` and `lambda.y0` as in
 the [step1](step1/) directory.
+
+## Lambda Abstractions
+
+The previous example we provided was of an invalid program. This is because in
+order to have a valid, non-empty one, we need at least one Lambda Calculus
+feature: the _lambda abstraction_.
+
+In `lambda`, this takes the form `\var.expr`, where `var` is an identifier and
+`expr` is an expression.
+
+To test it, we will first introduce an example of a valid program that defines
+the identity function.
+
+```haskell
+id = \x. x;
+```
+```status
+Success
+```
+
+Running this will fail on a syntax error:
+
+```sh
+$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec.md 
+# ...
+lambda-spec.md:327: Error: Syntax error
+1 Failed but 1 succeeded
+```
+
+The syntax error is there because we did not introduce the syntax for the lambda
+abstraction.
+
+First, update the `:grammar` in `lang-conf.edn` to the following:
+
+```clojure
+  :grammar "compilation_unit = definition*
+            
+            definition = identifier <'='> expr <';'>
+            
+            expr = identifier | lambda_abst
+            lambda_abst = <'\\\\'> identifier <'.'> expr
+            
+            identifier = #'[a-zA-Z_][a-zA-Z_0-9]*'
+            
+            --layout--
+            layout = #'\\s'+"
+```
+
+This new grammar defines the non-terminal `lambda_abst` as a form of `expr`, and
+defines it as `\`, followed by an identifier, followed by a `.`, followed by an
+expression.
+
+Note that in order to express a single `\` we needed a quadruple `\\\\`. This is
+because of double escaping, both in the EDN format and in the Instaparse syntax.
+
+Now we can rerun the spec and see if it works now...
+
+```sh
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec.md 
+# ...
+lambda-spec.md:327: Error: [:expr [:lambda_abst ...]] is not a valid lambda expression in [:definition id [:expr ...]]
+lambda-spec.md:327: Note: [:definition example/id [:expr [:lambda_abst example/x [:expr example/x]]]]
+1 Failed but 1 succeeded
+```
+
+Now the problem is that `[:expr [:lambda_abst example/x [:expr example/x]]]` is
+not a valid expression.
+
+Recall our definition of `lambda-expr`:
+
+```clojure
+(all [x]
+     (lambda-expr x ! x "is not a valid lambda expression"))
+```
+
+This definition rejects everything, stating it is not a lambda expression. This
+was fine for `bar` in the previous example, but not for the completely valid
+lambda abstraction in this example.
+
+To remedy this, we should define another rule that states that lambda
+abstractions are valid expressions.
+
+In `lambda.y0`, add the following:
+
+```clojure
+(all [x]
+     (lambda-expr [:expr x]) <-
+     (lambda-expr x))
+
+(all [v x]
+     (lambda-expr [:lambda_abst v x]) <-)
+```
+
+These rules are [deduction
+rules](https://github.com/brosenan/y0/blob/main/doc/conditions.md#deduction-rules),
+defined to make something true given some condition. Syntactically they are
+similar to the translation rule we saw earlier, only that the `=>` operator was
+replaced with `<-`.
+
+This should do the trick.
+
+```sh
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec.md 
+# ...
+2 Succeeded
+```
+
+What do they do? The first rule states that `[:expr x]` is defined a
+`lambda-expr` given that `x` is a `lambda-expr` (for any `x`). The
+second states that `[:lambda-abst v x]` is a `lambda-expr`, for every `v` and `x`.
+
+Currently, the second rule is unconditional (there is nothing after the `<-`),
+but this situation will soon change.
+
+### Validating the Body Expression
+
+The body of a lambda abstraction must be a valid expression for the abstraction
+to be valid.
+
+We can specify this in the spec by adding a negative example:
+
+```haskell
+id = \x. y;
+```
+```status
+ERROR: y is not a valid lambda expression in id = \x. y;
+```
+
+Now, running the spec will fail.
+
+```sh
+$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec.md 
+# ...
+Error: The example should have produced an error, but did not
+1 Failed but 2 succeeded
+```
+
+The reason for this failure is that we do not check the body of the lambda
+abstraction.
+
+We remedy this by updating the `:lambda-abst` rule.
+
+```clojure
+(all [v x]
+     (lambda-expr [:lambda_abst v x]) <-
+     (lambda-expr x))
+```
+
+However, we still get a failure:
+
+```sh
+$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec.md 
+# ...
+lambda-spec.md:327: Error: x is not a valid lambda expression in [:definition id [:expr ...]]
+lambda-spec.md:327: Note: [:definition example/id [:expr [:lambda_abst example/x [:expr example/x]]]]
+1 Failed but 2 succeeded
+```
+
+We fixed the new example, but broke the previous one.
+
+Why? Because now we are checking that the body of the lambda expression is an
+expression, and our current definition doesn't know that in `\x. x`, `x` is in
+fact a valid expression.
+
+`x` is a valid expression because it was introduced by the lambda abstraction as
+a variable. Our semantic rule needs to somehow capture this.
+
+We capture this using a
+[`given`
+condition](https://github.com/brosenan/y0/blob/main/doc/conditions.md#given-conditions).
+
+Update the rule for `:lambda-abst` to the following:
+
+```clojure
+(all [v x]
+     (lambda-expr [:lambda_abst v x]) <-
+     (given (fact (lambda-expr v))
+            (lambda-expr x)))
+```
+
+Now things seem to work.
+
+```sh
+$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec.md 
+# ...
+3 Succeeded
+```
+So, what did we just do?
+
+Before checking that `x` is a valid expression, we _assume_ that `v` is a valid
+expression. The `given` condition allows us to temporarily assume that something
+is true, in this case, the fact `(lambda-expr v)` (for whatever `v` is), and
+evaluate `x` under this assumption.
+
+This is a very natural way to introduce _definitions_ and _scopes_. `(fact
+(lambda-expr v))` _defines_ `v` within the _scope_ of `x`.
+
+### Step 2 Complete
+
+At this point you should have the files `lang-conf.edn` and `lambda.y0` as in
+the [step2](step2/) directory.
