@@ -1,0 +1,8 @@
+(ns lambda)
+
+(all [v x]
+     [:definition v x] =>
+     (assert (lambda-expr x)))
+
+(all [x]
+     (lambda-expr x ! x "is not a valid lambda expression"))

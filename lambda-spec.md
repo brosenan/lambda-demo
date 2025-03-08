@@ -305,3 +305,8 @@ $ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec.md
 # ...
 1 Succeeded
 ```
+
+### Step 1 Complete
+
+At this point you should have the files `lang-conf.edn` and `lambda.y0` as in
+the [step1](step1/) directory.
