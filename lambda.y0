@@ -21,3 +21,13 @@
      (lambda-expr [:func_application f x]) <-
      (lambda-expr f)
      (lambda-expr x))
+
+(all [v x]
+     [:public_def [:definition v x]] =>
+     [:definition v x]
+     (export [v' v]
+             (fact (lambda-expr v'))))
+
+(all [d]
+     [:import [:dep d]] =>
+     (import d))

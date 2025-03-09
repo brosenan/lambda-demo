@@ -2,9 +2,14 @@
  {;; Use an Instaparser
   :parser :insta
   ;; The grammar with a layout section
-  :grammar "compilation_unit = definition*
+  :grammar "compilation_unit = import* def*
             
+            import = <'import'> dep <';'>
+            dep = #'[a-z][a-z_0-9]*([.][a-z][a-z_0-9]*)*'
+            
+            <def> = definition | public_def
             definition = identifier <'='> expr <';'>
+            public_def = <'public'> definition
             
             expr =  lambda_abst | app_expr
             <app_expr> = func_application | arg_expr

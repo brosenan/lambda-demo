@@ -905,3 +905,288 @@ It worked!
 
 At this point, your `lang-conf.edn` and `lambda.y0` files should look like the
 ones in [step4/](step4/).
+
+## Modules
+
+At this point, the language definition is almost complete. However, no practical
+programming language (and this is by no means my way of saying that `lambda` is
+practical) can exist while only allowing single-file programs. And at this
+point, `lambda` only allows for programs to exist in a single module.
+
+To fix this, we need to allow `lambda` modules to import one another, and to
+export symbols to be used by other modules.
+
+### Public Definitions
+
+To control which definitions are being exported out of a given module, we
+introduce the keyword `public`. If this keyword is placed in front of a
+definition, the variable defined by that definition is exported, so that if that
+module is imported by some other module, that variable becomes available to in
+the scope of the other module.
+
+Within a given module, the `public` keyword can be safely ignored.
+
+We demonstrate this by repeating the `MULT` example, while defining `zero` and
+`PLUS` as `public`.
+
+```haskell
+public zero = \f.\x.x;
+public PLUS = \m.\n.\f.\x.m f (n f x);
+MULT = \m.\n.m (PLUS n) zero;
+```
+```status
+Success
+```
+
+Obviously, we get a syntax error, because `public` is not part of our syntax.
+
+```sh
+$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-5-1.md 
+# ...
+lambda-spec-5-1.md:111: Error: Syntax error
+1 Failed but 9 succeeded
+```
+
+Let's fix this.
+
+```clojure
+  :grammar "compilation_unit = def*
+            
+            <def> = definition | public_def
+            definition = identifier <'='> expr <';'>
+            public_def = <'public'> definition
+            
+            expr =  lambda_abst | app_expr
+            <app_expr> = func_application | arg_expr
+            <arg_expr> = identifier | <'('> expr <')'>
+
+            lambda_abst = <'\\\\'> identifier <'.'> expr
+            func_application = app_expr arg_expr
+            
+            identifier = #'[a-zA-Z_][a-zA-Z_0-9]*'
+            
+            --layout--
+            layout = (#'\\s' | #'--.*')+"
+```
+
+The difference is in the first two blocks. `compilation_unit` now consists of a
+sequence of `def`s, not `definition`s. A `def` is either a `definition` or a
+`public_def`, which is simply the keyword `public` followed by a `definition`.
+
+Now our syntax error is replaced with a semantic one:
+
+```sh
+$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-5-1.md 
+# ...
+lambda-spec-5-1.md:111: Error: No rules are defined to translate statement [:public_def [:definition ...]] and therefore it does not have any meaning
+lambda-spec-5-1.md:111: Note: [:public_def [:definition example/zero [:expr [:lambda_abst example/f [:expr [:lambda_abst example/x [:expr example/x]]]]]]]
+1 Failed but 9 succeeded
+```
+
+We have already seen a similar error message, when we first introduced
+`definition`. It states that we are missing a translation rule for `[:public_def
+[:definition ...]]`.
+
+Let's fix this by adding the following to `lambda.y0`.
+
+```clojure
+(all [v x]
+     [:public_def [:definition v x]] =>)
+```
+
+We added a translation rule (`=>`) that translates `[:public_def [:definition v
+x]]` (for any `v` and `x`) to... nothing so far.
+
+And it fails.
+
+```sh
+$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-5-1.md 
+# ...
+lambda-spec-5-1.md:113: Error: PLUS is not a valid lambda expression in [:definition MULT [:expr ...]]
+lambda-spec-5-1.md:112: Note: [:definition example/MULT [:expr [:lambda_abst example/m [:expr [:lambda_abst example/n [:expr [:func_application [:func_application example/m [:expr [:func_application example/PLUS example/n]]] example/zero]]]]]]]
+1 Failed but 9 succeeded
+```
+
+It fails, stating that `PLUS` is undefined. Why? Because a `public` definition
+does not (yet) translate into anything.
+
+Let's fix this by translating the `public` definition to the underlying
+definition.
+
+```clojure
+(all [v x]
+     [:public_def [:definition v x]] =>
+     [:definition v x])
+```
+
+And it works.
+
+```sh
+$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-5-1.md 
+# ...
+10 Succeeded
+```
+
+### The Import Statement
+
+Now we wish to add the ability to import things.
+
+Let us assume there exists some module `some.module`:
+```haskell
+public zero = \f.\x.x;
+public PLUS = \m.\n.\f.\x.m f (n f x);
+
+something_private = \x.x
+```
+
+We would like to import the public definitions in this module and use them in
+the following module. We do this using the `import` keyword.
+
+```haskell
+import some.module;
+
+MULT = \m.\n.m (PLUS n) zero;
+```
+```status
+Success
+```
+
+Obviously, we fail on a syntax error.
+
+```sh
+$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-5-2.md 
+lambda-spec-5-2.md:128: Error: Syntax error
+1 Failed but 10 succeeded
+```
+
+Let's add `import` to our grammar.
+
+```clojure
+  :grammar "compilation_unit = import* def*
+            
+            import = <'import'> dep <';'>
+            dep = #'[a-z][a-z_0-9]*([.][a-z][a-z_0-9]*)*'
+            
+            <def> = definition | public_def
+            definition = identifier <'='> expr <';'>
+            public_def = <'public'> definition
+            
+            expr =  lambda_abst | app_expr
+            <app_expr> = func_application | arg_expr
+            <arg_expr> = identifier | <'('> expr <')'>
+
+            lambda_abst = <'\\\\'> identifier <'.'> expr
+            func_application = app_expr arg_expr
+            
+            identifier = #'[a-zA-Z_][a-zA-Z_0-9]*'
+            
+            --layout--
+            layout = (#'\\s' | #'--.*')+"
+```
+
+We updated `compilation_unit` to start with zero or more `import`s, and defined
+`import` as the keyword `import`, followed by a `dep`, followed by a semicolon.
+
+A subtle but important point here is the name of the non-terminal `dep`. In our
+language config, we had the following setting:
+
+```clojure
+  ;; The keyword representing a dependency module name in the grammar
+  :dependency-kw :dep
+```
+
+This means that `dep` has a special meaning. It represents a dependency. After
+parsing, $y_0$ (and specifically, the Instaparse-based parser) traverses the
+parse tree looking for these nodes in the parse-tree. They resolve their value
+into a path (following a strategy that is also configured in the language
+config) and causes that module to be loaded, if it is not already.
+
+Now parsing succeeds, but `:import` has no meaning.
+
+```sh
+$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-5-2.md 
+# ...
+lambda-spec-5-2.md:128: Error: No rules are defined to translate statement [:import [:dep ...]] and therefore it does not have any meaning
+lambda-spec-5-2.md:128: Note: [:import [:dep example/some.module]]
+1 Failed but 10 succeeded
+```
+
+As before, we can fix this using an (initially empty) translation rule.
+
+```clojure
+(all [d]
+     [:import [:dep d]] =>)
+```
+
+This changes the problem to a familiar one.
+
+
+```sh
+$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-5-2.md 
+# ...
+lambda-spec-5-2.md:130: Error: PLUS is not a valid lambda expression in [:definition MULT [:expr ...]]
+lambda-spec-5-2.md:128: Note: [:definition example/MULT [:expr [:lambda_abst example/m [:expr [:lambda_abst example/n [:expr [:func_application [:func_application example/m [:expr [:func_application example/PLUS example/n]]] example/zero]]]]]]]
+1 Failed but 10 succeeded
+```
+
+### Exports and Imports
+
+So, once again, `PLUS` is not defined. Why is that? Because it is defined in one
+module, and not (yet) available in the other module.
+
+To fix this, we need to do two things. First, we need to `export` all `public`
+definitions. Then we need to `import` all exported definitions on an `:import`
+statement.
+
+For the first part, we add an `export` statement to the right-hand side of the
+translation rule for `:public`:
+
+```clojure
+(all [v x]
+     [:public_def [:definition v x]] =>
+     [:definition v x]
+     (export [v' v]
+             (fact (lambda-expr v'))))
+```
+
+The added part, namely:
+
+```clojure
+     (export [v' v]
+             (fact (lambda-expr v')))
+```
+
+Consists of a head (`[v' v]`), which defines a variable `v'` as the "imported"
+version of `v` (whatever `v` is) and then states the fact that `v'` is a valid
+lambda expression.
+
+This statement is not automatically true. For it to be true (for `v'` to be
+assigned a target module), it needs to be imported.
+
+We add an `import` statement to the right-hand side of the `:import` translation
+rule.
+
+```clojure
+(all [d]
+     [:import [:dep d]] =>
+     (import d))
+```
+
+This tells $y_0$ to fetche all the `export`ed statements from module `d` and
+apply them to the current module.
+
+This does the trick.
+
+```sh
+$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-5-2.md 
+# ...
+11 Succeeded
+```
+
+### Step 5 Complete
+
+That's it. Our language is now complete. The root directory of this repo
+contains `lambda.y0` and `lang-conf.edn` as of this point.
+
+However, we are not done with the tutorial. We still need to see how this
+language definition can provide us actual language tool support.
