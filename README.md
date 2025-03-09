@@ -440,7 +440,7 @@ ERROR: y is not a valid lambda expression in id = \x. y;
 Now, running the spec will fail.
 
 ```sh
-$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-2-2.md 
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-2-2.md 
 # ...
 Error: The example should have produced an error, but did not
 1 Failed but 2 succeeded
@@ -460,7 +460,7 @@ We remedy this by updating the `:lambda-abst` rule.
 However, we still get a failure:
 
 ```sh
-$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-2-2.md 
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-2-2.md 
 # ...
 lambda-spec-2-2.md:19: Error: x is not a valid lambda expression in [:definition id [:expr ...]]
 lambda-spec-2-2.md:19: Note: [:definition example/id [:expr [:lambda_abst example/x [:expr example/x]]]]
@@ -492,7 +492,7 @@ Update the rule for `:lambda-abst` to the following:
 Now things seem to work.
 
 ```sh
-$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-2-2.md 
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-2-2.md 
 # ...
 3 Succeeded
 ```
@@ -623,7 +623,7 @@ application as a lambda expression.
 This does the trick.
 
 ```sh
-$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-3-1.md 
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-3-1.md 
 # ...
 4 Succeeded
 ```
@@ -642,7 +642,7 @@ ERROR: f1 is not a valid lambda expression in one = \f.\x.f1 x;
 Which fails as expected:
 
 ```sh
-$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-3-2.md
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-3-2.md
 # ...
 Error: The example should have produced an error, but did not
 1 Failed but 4 succeeded
@@ -659,7 +659,7 @@ To fix this, we add a check that `f` is a lambda expression.
 This works.
 
 ```sh
-$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-3-2.md 
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-3-2.md 
 # ...
 5 Succeeded
 ```
@@ -674,7 +674,7 @@ ERROR: x1 is not a valid lambda expression in one = \f.\x.f x1;
 ```
 
 ```sh
-$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-3-3.md 
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-3-3.md 
 # ...
 Error: The example should have produced an error, but did not
 1 Failed but 5 succeeded
@@ -692,7 +692,7 @@ To fix this, we add a check that the argument is a valid expression.
 This works.
 
 ```sh
-$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-3-3.md 
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-3-3.md 
 # ...
 6 Succeeded
 ```
@@ -712,7 +712,7 @@ Success
 It fails on a syntax error:
 
 ```sh
-$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-3-4.md 
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-3-4.md 
 # ...
 lambda-spec-3-4.md:64: Error: Syntax error
 1 Failed but 6 succeeded
@@ -730,7 +730,7 @@ Parentheses are the way we can "upgrade" from a `arg_expr` all the way back to a
 This does the trick.
 
 ```sh
-$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-3-4.md 
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-3-4.md 
 # ...
 7 Succeeded
 ```
@@ -787,7 +787,7 @@ The definition of `zero` and `PLUS` are self contained, but the definition of
 Unfortunately, this currently fails.
 
 ```sh
-$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-4-1.md 
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-4-1.md 
 # ...
 lambda-spec-4-1.md:75: Error: PLUS is not a valid lambda expression in [:definition MULT [:expr ...]]
 lambda-spec-4-1.md:74: Note: [:definition example/MULT [:expr [:lambda_abst example/m [:expr [:lambda_abst example/n [:expr [:func_application [:func_application example/m [:expr [:func_application example/PLUS example/n]]] example/zero]]]]]]]
@@ -811,7 +811,7 @@ In `lambda.y0`, update the translation rule for `:definition` to the following:
 This does the trick.
 
 ```sh
-$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-4-1.md 
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-4-1.md 
 # ...
 8 Succeeded
 ```
@@ -859,7 +859,7 @@ Success
 ```
 
 ```sh
-$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-4-2.md 
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-4-2.md 
 # ...
 lambda-spec-4-2.md:84: Error: Syntax error
 1 Failed but 8 succeeded
@@ -894,7 +894,7 @@ This makes our complete grammar look like this:
 ```
 
 ```sh
-$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-4-2.md 
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-4-2.md 
 # ...
 9 Succeeded
 ```
@@ -941,7 +941,7 @@ Success
 Obviously, we get a syntax error, because `public` is not part of our syntax.
 
 ```sh
-$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-5-1.md 
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-5-1.md 
 # ...
 lambda-spec-5-1.md:111: Error: Syntax error
 1 Failed but 9 succeeded
@@ -976,7 +976,7 @@ sequence of `def`s, not `definition`s. A `def` is either a `definition` or a
 Now our syntax error is replaced with a semantic one:
 
 ```sh
-$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-5-1.md 
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-5-1.md 
 # ...
 lambda-spec-5-1.md:111: Error: No rules are defined to translate statement [:public_def [:definition ...]] and therefore it does not have any meaning
 lambda-spec-5-1.md:111: Note: [:public_def [:definition example/zero [:expr [:lambda_abst example/f [:expr [:lambda_abst example/x [:expr example/x]]]]]]]
@@ -1000,7 +1000,7 @@ x]]` (for any `v` and `x`) to... nothing so far.
 And it fails.
 
 ```sh
-$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-5-1.md 
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-5-1.md 
 # ...
 lambda-spec-5-1.md:113: Error: PLUS is not a valid lambda expression in [:definition MULT [:expr ...]]
 lambda-spec-5-1.md:112: Note: [:definition example/MULT [:expr [:lambda_abst example/m [:expr [:lambda_abst example/n [:expr [:func_application [:func_application example/m [:expr [:func_application example/PLUS example/n]]] example/zero]]]]]]]
@@ -1022,7 +1022,7 @@ definition.
 And it works.
 
 ```sh
-$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-5-1.md 
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-5-1.md 
 # ...
 10 Succeeded
 ```
@@ -1054,7 +1054,7 @@ Success
 Obviously, we fail on a syntax error.
 
 ```sh
-$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-5-2.md 
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-5-2.md 
 lambda-spec-5-2.md:128: Error: Syntax error
 1 Failed but 10 succeeded
 ```
@@ -1104,7 +1104,7 @@ config) and causes that module to be loaded, if it is not already.
 Now parsing succeeds, but `:import` has no meaning.
 
 ```sh
-$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-5-2.md 
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-5-2.md 
 # ...
 lambda-spec-5-2.md:128: Error: No rules are defined to translate statement [:import [:dep ...]] and therefore it does not have any meaning
 lambda-spec-5-2.md:128: Note: [:import [:dep example/some.module]]
@@ -1122,7 +1122,7 @@ This changes the problem to a familiar one.
 
 
 ```sh
-$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-5-2.md 
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-5-2.md 
 # ...
 lambda-spec-5-2.md:130: Error: PLUS is not a valid lambda expression in [:definition MULT [:expr ...]]
 lambda-spec-5-2.md:128: Note: [:definition example/MULT [:expr [:lambda_abst example/m [:expr [:lambda_abst example/n [:expr [:func_application [:func_application example/m [:expr [:func_application example/PLUS example/n]]] example/zero]]]]]]]
@@ -1178,7 +1178,7 @@ apply them to the current module.
 This does the trick.
 
 ```sh
-$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-5-2.md 
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-5-2.md 
 # ...
 11 Succeeded
 ```
