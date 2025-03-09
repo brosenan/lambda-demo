@@ -122,6 +122,8 @@ Consider some module `some.module`:
 ```haskell
 public zero = \f.\x.x;
 public PLUS = \m.\n.\f.\x.m f (n f x);
+
+something_private = \x.x;
 ```
 
 ```haskell

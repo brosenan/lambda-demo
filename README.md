@@ -1036,7 +1036,7 @@ Let us assume there exists some module `some.module`:
 public zero = \f.\x.x;
 public PLUS = \m.\n.\f.\x.m f (n f x);
 
-something_private = \x.x
+something_private = \x.x;
 ```
 
 We would like to import the public definitions in this module and use them in
