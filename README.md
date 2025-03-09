@@ -64,7 +64,8 @@ JAR file containing the $y_0$ CLI tool. Please download this file by clicking
 "Raw" on the right-hand side of the page, and place it in a new (empty) project
 directory.
 
-Now, also place a copy of this file (`lambda-spec.md`) in that same directory.
+Now, also place a copy of this files (`lambda-spec-*.md`) in that same
+directory.
 
 Make sure you have a terminal open within that directory, and that you have some
 recent version of `java` installed and in your `PATH`.
@@ -222,12 +223,10 @@ ERROR: bar is not a valid lambda expression in foo = bar;
 Now, we can test our language definition against this example, by running:
 
 ```sh
-$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec.md 
-WARNING: assert already refers to: #'clojure.core/assert in namespace: y0.core, being replaced by: #'y0.core/assert
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-1.md 
 # ...
-nil
-lambda-spec.md:206: Error: The wrong error was reported: No rules are defined to translate statement [:definition foo [:expr ...]] and therefore it does not have any meaning
-lambda-spec.md:206: Note: [:definition example/foo [:expr example/bar]]
+lambda-spec-1.md:10: Error: The wrong error was reported: No rules are defined to translate statement [:definition foo [:expr ...]] and therefore it does not have any meaning
+lambda-spec-1.md:10: Note: [:definition example/foo [:expr example/bar]]
 1 Failed 
 ```
 
@@ -259,7 +258,7 @@ is the result of parsing `v = x;`)... means nothing.
 Now we get a different failure:
 
 ```sh
-$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec.md 
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-1.md 
 # ...
 Error: The example should have produced an error, but did not
 1 Failed 
@@ -301,7 +300,7 @@ fails, providing the specified error message.
 This is enough for our first example to pass.
 
 ```sh
-$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec.md 
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-1.md 
 # ...
 1 Succeeded
 ```
@@ -333,9 +332,9 @@ Success
 Running this will fail on a syntax error:
 
 ```sh
-$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec.md 
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-2-1.md 
 # ...
-lambda-spec.md:327: Error: Syntax error
+lambda-spec-2-1.md:19: Error: Syntax error
 1 Failed but 1 succeeded
 ```
 
@@ -368,10 +367,10 @@ because of double escaping, both in the EDN format and in the Instaparse syntax.
 Now we can rerun the spec and see if it works now...
 
 ```sh
-$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec.md 
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-2-1.md
 # ...
-lambda-spec.md:327: Error: [:expr [:lambda_abst ...]] is not a valid lambda expression in [:definition id [:expr ...]]
-lambda-spec.md:327: Note: [:definition example/id [:expr [:lambda_abst example/x [:expr example/x]]]]
+lambda-spec-2-1.md:19: Error: [:expr [:lambda_abst ...]] is not a valid lambda expression in [:definition id [:expr ...]]
+lambda-spec-2-1.md:19: Note: [:definition example/id [:expr [:lambda_abst example/x [:expr example/x]]]]
 1 Failed but 1 succeeded
 ```
 
@@ -412,7 +411,7 @@ replaced with `<-`.
 This should do the trick.
 
 ```sh
-$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec.md 
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-2-1.md 
 # ...
 2 Succeeded
 ```
@@ -441,7 +440,7 @@ ERROR: y is not a valid lambda expression in id = \x. y;
 Now, running the spec will fail.
 
 ```sh
-$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec.md 
+$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-2-2.md 
 # ...
 Error: The example should have produced an error, but did not
 1 Failed but 2 succeeded
@@ -461,10 +460,10 @@ We remedy this by updating the `:lambda-abst` rule.
 However, we still get a failure:
 
 ```sh
-$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec.md 
+$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-2-2.md 
 # ...
-lambda-spec.md:327: Error: x is not a valid lambda expression in [:definition id [:expr ...]]
-lambda-spec.md:327: Note: [:definition example/id [:expr [:lambda_abst example/x [:expr example/x]]]]
+lambda-spec-2-2.md:19: Error: x is not a valid lambda expression in [:definition id [:expr ...]]
+lambda-spec-2-2.md:19: Note: [:definition example/id [:expr [:lambda_abst example/x [:expr example/x]]]]
 1 Failed but 2 succeeded
 ```
 
@@ -493,7 +492,7 @@ Update the rule for `:lambda-abst` to the following:
 Now things seem to work.
 
 ```sh
-$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec.md 
+$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-2-2.md 
 # ...
 3 Succeeded
 ```
@@ -530,7 +529,7 @@ Success
 This, obviously fails because we did not define it.
 
 ```sh
-$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec.md 
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-3-1.md 
 # ...
 lambda-spec.md:525: Error: Syntax error
 1 Failed but 3 succeeded
@@ -580,17 +579,6 @@ A `func_application` consists of an `app_expr` and an `arg_expr`. The fact that
 the `app_expr` is on the left, combined with the fact that `app_expr` can be
 `func_application` by itself, means that it is left-associative.
 
-Now, when we evaluate the spec, we get semantic errors, meaning that the grammar
-works.
-
-```sh
-$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec.md 
-# ...
-lambda-spec.md:524: Error: [:func_application f x] is not a valid lambda expression in [:definition one [:expr ...]]
-lambda-spec.md:524: Note: [:definition example/one [:expr [:lambda_abst example/f [:expr [:lambda_abst example/x [:expr [:func_application example/f example/x]]]]]]]
-1 Failed but 3 succeeded
-```
-
 Now, our complete grammar looks as follows:
 
 ```clojure
@@ -611,6 +599,17 @@ Now, our complete grammar looks as follows:
             layout = #'\\s'+"
 ```
 
+When we evaluate the spec, we get semantic errors, meaning that the grammar
+works.
+
+```sh
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-3-1.md 
+# ...
+lambda-spec-3-1.md:37: Error: [:func_application f x] is not a valid lambda expression in [:definition one [:expr ...]]
+lambda-spec-3-1.md:37: Note: [:definition example/one [:expr [:lambda_abst example/f [:expr [:lambda_abst example/x [:expr [:func_application example/f example/x]]]]]]]
+1 Failed but 3 succeeded
+```
+
 ### Semantics
 
 To solve the above error we need to add a deduction rule to define a function
@@ -624,7 +623,7 @@ application as a lambda expression.
 This does the trick.
 
 ```sh
-$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec.md 
+$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-3-1.md 
 # ...
 4 Succeeded
 ```
@@ -643,7 +642,7 @@ ERROR: f1 is not a valid lambda expression in one = \f.\x.f1 x;
 Which fails as expected:
 
 ```sh
-$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec.md 
+$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-3-2.md
 # ...
 Error: The example should have produced an error, but did not
 1 Failed but 4 succeeded
@@ -660,7 +659,7 @@ To fix this, we add a check that `f` is a lambda expression.
 This works.
 
 ```sh
-$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec.md 
+$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-3-2.md 
 # ...
 5 Succeeded
 ```
@@ -675,7 +674,7 @@ ERROR: x1 is not a valid lambda expression in one = \f.\x.f x1;
 ```
 
 ```sh
-$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec.md 
+$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-3-3.md 
 # ...
 Error: The example should have produced an error, but did not
 1 Failed but 5 succeeded
@@ -693,7 +692,7 @@ To fix this, we add a check that the argument is a valid expression.
 This works.
 
 ```sh
-$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec.md 
+$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-3-3.md 
 # ...
 6 Succeeded
 ```
@@ -713,9 +712,9 @@ Success
 It fails on a syntax error:
 
 ```sh
-$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec.md 
+$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-3-4.md 
 # ...
-lambda-spec.md:700: Error: Syntax error
+lambda-spec-3-4.md:64: Error: Syntax error
 1 Failed but 6 succeeded
 ```
 
@@ -731,7 +730,7 @@ Parentheses are the way we can "upgrade" from a `arg_expr` all the way back to a
 This does the trick.
 
 ```sh
-$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec.md 
+$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-3-4.md 
 # ...
 7 Succeeded
 ```

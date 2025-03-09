@@ -1,7 +1,6 @@
-# Lambda: An Example Language: Step 2 Spec
+# Lambda: An Example Language
 
-This is the part of the spec that should pass after completing step 1 of this
-tutorial.
+This is a shortened spec for the `lambda` language.
 
 Language: `lambda`
 
@@ -14,7 +13,7 @@ foo = bar;
 ERROR: bar is not a valid lambda expression in foo = bar;
 ```
 
-## Step 2
+## Step 2.1
 
 ```haskell
 id = \x. x;
@@ -22,6 +21,8 @@ id = \x. x;
 ```status
 Success
 ```
+
+## Step 2.2
 
 ```haskell
 id = \x. y;
