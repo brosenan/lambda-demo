@@ -759,3 +759,149 @@ Our complete grammar now looks like this:
 
 At this point, your `lang-conf.edn` and `lambda.y0` files should look like the
 ones in [step3/](step3/).
+
+## Definitions
+
+We have touched on definitions [earlier](#initial-language) in this tutorial,
+but omitted one important part: their ability to actually _define_.
+
+Let us consider the following example from the example at the beginning of this
+tutorial:
+
+```haskell
+zero = \f.\x.x;
+PLUS = \m.\n.\f.\x.m f (n f x);
+MULT = \m.\n.m (PLUS n) zero;
+```
+```status
+Success
+```
+
+In this example we define three expressions. `zero` represents the Church
+numeral `0`, `PLUS` that represents the `+` operator for Church numerals and
+`MULT` that represents `*`.
+
+The definition of `zero` and `PLUS` are self contained, but the definition of
+`MULT` depends on the other two.
+
+Unfortunately, this currently fails.
+
+```sh
+$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-4-1.md 
+# ...
+lambda-spec-4-1.md:75: Error: PLUS is not a valid lambda expression in [:definition MULT [:expr ...]]
+lambda-spec-4-1.md:74: Note: [:definition example/MULT [:expr [:lambda_abst example/m [:expr [:lambda_abst example/n [:expr [:func_application [:func_application example/m [:expr [:func_application example/PLUS example/n]]] example/zero]]]]]]]
+1 Failed but 7 succeeded
+```
+
+It fails claming that `PLUS` is not a lambda expression. Indeed, this is
+currently the case. We did not do anything to make it a lambda expression.
+
+Fortunately, this is easily-rectifiable.
+
+In `lambda.y0`, update the translation rule for `:definition` to the following:
+
+```clojure
+(all [v x]
+     [:definition v x] =>
+     (assert (lambda-expr x))
+     (fact (lambda-expr v)))
+```
+
+This does the trick.
+
+```sh
+$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-4-1.md 
+# ...
+8 Succeeded
+```
+
+So, what did we do? We added a second statement on the right-hand side of the
+`=>` operator of that rule:
+
+```clojure
+     (fact (lambda-expr v))
+```
+
+This `fact` states that from this point on, `v` (or whatever it represents) is a
+`lambda-expr`. In our case, `v` is replaced with both `zero` and `PLUS`. Now,
+when we check if they are expressions, thanks to this new fact, the check
+succeeds.
+
+### Final Touches
+
+Now we are ready to repeat the complete example from the beginning of the
+tutorial, this time as an official positive example.
+
+```haskell
+-- The identity function
+id = \x. x;
+
+-- Church Numerals
+zero = \f.\x.x;
+one = \f.\x.f x;
+two = \f.\x.f (f x);
+
+-- Arithmetic
+PLUS = \m.\n.\f.\x.m f (n f x);
+MULT = \m.\n.m (PLUS n) zero;
+
+-- Logic
+TRUE = \x.\y.x;
+FALSE = \x.\y.y;
+AND = \p.\q.p q p;
+OR = \p.\q.p p q;
+NOT = \p.p FALSE TRUE;
+IFTHENELSE = \p.\a.\b.p a b;
+```
+```status
+Success
+```
+
+```sh
+$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-4-2.md 
+# ...
+lambda-spec-4-2.md:84: Error: Syntax error
+1 Failed but 8 succeeded
+```
+
+It fails on a syntax error. What new syntax did we add? Comments!
+
+Let's add line comments (starting with `--`) to the `layout` in our grammar.
+
+```
+layout = (#'\\s' | #'--.*')+
+```
+
+This makes our complete grammar look like this:
+
+```clojure
+  :grammar "compilation_unit = definition*
+            
+            definition = identifier <'='> expr <';'>
+            
+            expr =  lambda_abst | app_expr
+            <app_expr> = func_application | arg_expr
+            <arg_expr> = identifier | <'('> expr <')'>
+
+            lambda_abst = <'\\\\'> identifier <'.'> expr
+            func_application = app_expr arg_expr
+            
+            identifier = #'[a-zA-Z_][a-zA-Z_0-9]*'
+            
+            --layout--
+            layout = (#'\\s' | #'--.*')+"
+```
+
+```sh
+$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec-4-2.md 
+# ...
+9 Succeeded
+```
+
+It worked!
+
+### Step 4 Complete
+
+At this point, your `lang-conf.edn` and `lambda.y0` files should look like the
+ones in [step4/](step4/).
