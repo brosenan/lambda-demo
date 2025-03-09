@@ -308,8 +308,8 @@ $ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec.md
 
 ### Step 1 Complete
 
-At this point you should have the files `lang-conf.edn` and `lambda.y0` as in
-the [step1](step1/) directory.
+At this point, your `lang-conf.edn` and `lambda.y0` files should look like the
+ones in [step1/](step1/).
 
 ## Lambda Abstractions
 
@@ -509,5 +509,254 @@ This is a very natural way to introduce _definitions_ and _scopes_. `(fact
 
 ### Step 2 Complete
 
-At this point you should have the files `lang-conf.edn` and `lambda.y0` as in
-the [step2](step2/) directory.
+At this point, your `lang-conf.edn` and `lambda.y0` files should look like the
+ones in [step2/](step2/).
+
+## Function Application
+
+A function application has the form `f x`, where both `f` and `x` are lambda
+expressions.
+
+We use the definition of `one` from the top of this tutorial as an example for
+the usage of function application.
+
+```haskell
+one = \f.\x.f x;
+```
+```status
+Success
+```
+
+This, obviously fails because we did not define it.
+
+```sh
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec.md 
+# ...
+lambda-spec.md:525: Error: Syntax error
+1 Failed but 3 succeeded
+```
+
+### Associativity and Precedence
+
+Syntax first.
+
+At first glance, we could have gone by with the following definition:
+
+```
+            expr = identifier | lambda_abst | func_application
+            func_application = expr expr
+```
+
+However, this definition has two problems. First, it does not define
+associativity for function applications. Given the expression `a b c`, it could
+be interpreted as either `(a b) c` or `a (b c)`, while only the former is
+correct.
+
+Second, it does not define precedence between lambda abstractions and function
+applications. The expression `\a. b c` could either be interpreted as `(\a. b)
+c` or `\a. (b c)`, but only the latter is correct.
+
+To remedy this, we define a heirarchy of expressions, assigning different
+precedence to different types of expressions.
+
+```
+            expr =  lambda_abst | app_expr
+            <app_expr> = func_application | arg_expr
+            <arg_expr> = identifier
+
+            func_application = app_expr arg_expr
+```
+
+We classify `lambda_abst` as `expr`, `func_application` as `app_expr` and an
+identifier (a variable) as `arg_expr`. An `expr` can resolve to `app_expr` and
+`arg_expr`, but not the other way around. This makes the associativity explicit.
+
+We placed `app_expr` and `arg_expr` inside `<>` on the left hand side of the
+rules as a way to tell Instaparse not to add these rules as extra nodes in the
+parse-tree. In other words, this is our way to tell Instaparse that these are
+syntactic classes, but semantically they are inseparable from `expr`.
+
+A `func_application` consists of an `app_expr` and an `arg_expr`. The fact that
+the `app_expr` is on the left, combined with the fact that `app_expr` can be
+`func_application` by itself, means that it is left-associative.
+
+Now, when we evaluate the spec, we get semantic errors, meaning that the grammar
+works.
+
+```sh
+$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec.md 
+# ...
+lambda-spec.md:524: Error: [:func_application f x] is not a valid lambda expression in [:definition one [:expr ...]]
+lambda-spec.md:524: Note: [:definition example/one [:expr [:lambda_abst example/f [:expr [:lambda_abst example/x [:expr [:func_application example/f example/x]]]]]]]
+1 Failed but 3 succeeded
+```
+
+Now, our complete grammar looks as follows:
+
+```clojure
+  :grammar "compilation_unit = definition*
+            
+            definition = identifier <'='> expr <';'>
+            
+            expr =  lambda_abst | app_expr
+            <app_expr> = func_application | arg_expr
+            <arg_expr> = identifier
+
+            lambda_abst = <'\\\\'> identifier <'.'> expr
+            func_application = app_expr arg_expr
+            
+            identifier = #'[a-zA-Z_][a-zA-Z_0-9]*'
+            
+            --layout--
+            layout = #'\\s'+"
+```
+
+### Semantics
+
+To solve the above error we need to add a deduction rule to define a function
+application as a lambda expression.
+
+```clojure
+(all [f x]
+     (lambda-expr [:func_application f x]) <-)
+```
+
+This does the trick.
+
+```sh
+$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec.md 
+# ...
+4 Succeeded
+```
+
+However, this isn't (yet) doing what we really want. To demonstrate this, we
+will add two negative examples. First, we will add a `f` that is not an
+expression.
+
+```haskell
+one = \f.\x.f1 x;
+```
+```status
+ERROR: f1 is not a valid lambda expression in one = \f.\x.f1 x;
+```
+
+Which fails as expected:
+
+```sh
+$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec.md 
+# ...
+Error: The example should have produced an error, but did not
+1 Failed but 4 succeeded
+```
+
+To fix this, we add a check that `f` is a lambda expression.
+
+```clojure
+(all [f x]
+     (lambda-expr [:func_application f x]) <-
+     (lambda-expr f))
+```
+
+This works.
+
+```sh
+$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec.md 
+# ...
+5 Succeeded
+```
+
+Similarly, let's add a negative example where the argument is not an expression.
+
+```haskell
+one = \f.\x.f x1;
+```
+```status
+ERROR: x1 is not a valid lambda expression in one = \f.\x.f x1;
+```
+
+```sh
+$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec.md 
+# ...
+Error: The example should have produced an error, but did not
+1 Failed but 5 succeeded
+```
+
+To fix this, we add a check that the argument is a valid expression.
+
+```clojure
+(all [f x]
+     (lambda-expr [:func_application f x]) <-
+     (lambda-expr f)
+     (lambda-expr x))
+```
+
+This works.
+
+```sh
+$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec.md 
+# ...
+6 Succeeded
+```
+
+### Parentheses
+
+Now, let's challenge our definition with a complex definition, such as the one
+for `PLUS` in the example at the beginning of this tutorial.
+
+```haskell
+PLUS = \m.\n.\f.\x.m f (n f x);
+```
+```status
+Success
+```
+
+It fails on a syntax error:
+
+```sh
+$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec.md 
+# ...
+lambda-spec.md:700: Error: Syntax error
+1 Failed but 6 succeeded
+```
+
+The reason for this are the parentheses.
+
+Parentheses are the way we can "upgrade" from a `arg_expr` all the way back to a
+`expr`.
+
+```
+            <arg_expr> = identifier | <'('> expr <')'>
+```
+
+This does the trick.
+
+```sh
+$ java -jar ~/clj/y0/lsp/bin/y0.jar -c lang-conf.edn -p . -s lambda-spec.md 
+# ...
+7 Succeeded
+```
+
+Our complete grammar now looks like this:
+
+```clojure
+  :grammar "compilation_unit = definition*
+            
+            definition = identifier <'='> expr <';'>
+            
+            expr =  lambda_abst | app_expr
+            <app_expr> = func_application | arg_expr
+            <arg_expr> = identifier | <'('> expr <')'>
+
+            lambda_abst = <'\\\\'> identifier <'.'> expr
+            func_application = app_expr arg_expr
+            
+            identifier = #'[a-zA-Z_][a-zA-Z_0-9]*'
+            
+            --layout--
+            layout = #'\\s'+"
+```
+
+### Step 3 Complete
+
+At this point, your `lang-conf.edn` and `lambda.y0` files should look like the
+ones in [step3/](step3/).
