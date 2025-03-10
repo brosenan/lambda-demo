@@ -131,14 +131,3 @@ IFTHENELSE = \p a b.p a b;
 ```status
 Success
 ```
-
-## Step 5.1
-
-```haskell
-public zero = \f.\x.x;
-public PLUS = \m.\n.\f.\x.m f (n f x);
-MULT = \m.\n.m (PLUS n) zero;
-```
-```status
-Success
-```

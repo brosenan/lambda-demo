@@ -901,6 +901,250 @@ $ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-4-2.md
 
 It worked!
 
+## Multi-Parameter Syntax
+
+A common improvement on the standard Lambda abstraction syntax is to allow
+a single `\` to be followed by multiple variable names, representing a sequence
+of abstractions, or [Currying](https://en.wikipedia.org/wiki/Currying).
+
+For example, the expression `\x y z.x` is shorthand for `\x.\y.\z.x`.
+
+The following example repeats the above program, but now, using this shorthand
+notation.
+
+```haskell
+-- The identity function
+id = \x. x;
+
+-- Church Numerals
+zero = \f x.x;
+one = \f x.f x;
+two = \f x.f (f x);
+
+-- Arithmetic
+PLUS = \m n f x.m f (n f x);
+MULT = \m n.m (PLUS n) zero;
+
+-- Logic
+TRUE = \x y.x;
+FALSE = \x y.y;
+AND = \p q.p q p;
+OR = \p q.p p q;
+NOT = \p.p FALSE TRUE;
+IFTHENELSE = \p a b.p a b;
+```
+```status
+Success
+```
+
+As expected, it fails on a syntax error:
+
+```sh
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-4-3.md 
+# ...
+lambda-spec-4-3.md:115: Error: Syntax error
+1 Failed but 9 succeeded
+```
+
+To solve this, we tweak the grammar:
+
+```
+            lambda_abst = <'\\\\'> params <'.'> expr
+            params = identifier+
+```
+
+Instead of an `identifier`, we now get `params` after the `\`, which by itself
+is a sequence of one or more `identifier`s.
+
+Rather than creating a new non-terminal (`params`), we could have just changed
+`lambda_abst`'s syntax to:
+
+```
+            lambda_abst = <'\\\\'> identifier+ <'.'> expr
+```
+
+However, that would have resulted in the `lambda_abst` node having a variable
+number of elements, where the last one (`expr`) has a different meaning, and
+that is hard to process in $y_0$.
+
+Instead, we create a new non-terminal (`params`) which will translate into a new
+node (`:params`) containing all our parameters.
+
+The complete grammar looks like this:
+
+```clojure
+  :grammar "compilation_unit = definition*
+            
+            definition = identifier <'='> expr <';'>
+            
+            expr =  lambda_abst | app_expr
+            <app_expr> = func_application | arg_expr
+            <arg_expr> = identifier | <'('> expr <')'>
+
+            lambda_abst = <'\\\\'> params <'.'> expr
+            params = identifier+
+
+            func_application = app_expr arg_expr
+            
+            identifier = #'[a-zA-Z_][a-zA-Z_0-9]*'
+            
+            --layout--
+            layout = (#'\\s' | #'--.*')+"
+```
+
+Now when we evaluate our spec we get a bunch of semantic errors.
+
+```sh
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-4-3.md 
+# ...
+lambda-spec-4-3.md:112: Error: x is not a valid lambda expression in [:definition id [:expr ...]]
+lambda-spec-4-3.md:111: Note: [:definition example/id [:expr [:lambda_abst [:params example/x] [:expr example/x]]]]
+lambda-spec-4-3.md:85: Error: x is not a valid lambda expression in [:definition id [:expr ...]]
+lambda-spec-4-3.md:84: Note: [:definition example/id [:expr [:lambda_abst [:params example/x] [:expr example/x]]]]
+/home/boaz/clj/lambda-demo/./lambda.y0:17: Error: The rule for (lambda-expr [:params ...]) conflicts with a previous rule defining (lambda-expr [:params ...]) in predicate lambda-expr with arity 1
+/home/boaz/clj/lambda-demo/./lambda.y0:17: Note: (/home/boaz/clj/lambda-demo/./lambda.y0/lambda-expr [:params example/x])
+/home/boaz/clj/lambda-demo/./lambda.y0:17: Note: (/home/boaz/clj/lambda-demo/./lambda.y0/lambda-expr [:params example/f])
+/home/boaz/clj/lambda-demo/./lambda.y0:17: Error: The rule for (lambda-expr [:params ...]) conflicts with a previous rule defining (lambda-expr [:params ...]) in predicate lambda-expr with arity 1
+/home/boaz/clj/lambda-demo/./lambda.y0:17: Note: (/home/boaz/clj/lambda-demo/./lambda.y0/lambda-expr [:params example/n])
+/home/boaz/clj/lambda-demo/./lambda.y0:17: Note: (/home/boaz/clj/lambda-demo/./lambda.y0/lambda-expr [:params example/m])
+/home/boaz/clj/lambda-demo/./lambda.y0:17: Error: The wrong error was reported: The rule for (lambda-expr [:params ...]) conflicts with a previous rule defining (lambda-expr [:params ...]) in predicate lambda-expr with arity 1
+/home/boaz/clj/lambda-demo/./lambda.y0:17: Note: (/home/boaz/clj/lambda-demo/./lambda.y0/lambda-expr [:params example/x])
+/home/boaz/clj/lambda-demo/./lambda.y0:17: Note: (/home/boaz/clj/lambda-demo/./lambda.y0/lambda-expr [:params example/f])
+/home/boaz/clj/lambda-demo/./lambda.y0:17: Error: The wrong error was reported: The rule for (lambda-expr [:params ...]) conflicts with a previous rule defining (lambda-expr [:params ...]) in predicate lambda-expr with arity 1
+/home/boaz/clj/lambda-demo/./lambda.y0:17: Note: (/home/boaz/clj/lambda-demo/./lambda.y0/lambda-expr [:params example/x])
+/home/boaz/clj/lambda-demo/./lambda.y0:17: Note: (/home/boaz/clj/lambda-demo/./lambda.y0/lambda-expr [:params example/f])
+/home/boaz/clj/lambda-demo/./lambda.y0:17: Error: The rule for (lambda-expr [:params ...]) conflicts with a previous rule defining (lambda-expr [:params ...]) in predicate lambda-expr with arity 1
+/home/boaz/clj/lambda-demo/./lambda.y0:17: Note: (/home/boaz/clj/lambda-demo/./lambda.y0/lambda-expr [:params example/x])
+/home/boaz/clj/lambda-demo/./lambda.y0:17: Note: (/home/boaz/clj/lambda-demo/./lambda.y0/lambda-expr [:params example/f])
+lambda-spec-4-3.md:19: Error: x is not a valid lambda expression in [:definition id [:expr ...]]
+lambda-spec-4-3.md:19: Note: [:definition example/id [:expr [:lambda_abst [:params example/x] [:expr example/x]]]]
+8 Failed but 2 succeeded
+```
+
+Wow! 8 errors! we sure have done something wrong!
+
+Well, we changed the structure of the parse-tree without changing the rules
+applied to it.
+
+Specifically, we changed the structure of `:lambda_abst` without changing the
+deduction rule defining its semantics.
+
+So let's do this.
+
+```clojure
+(all [ps x]
+     (lambda-expr [:lambda_abst ps x]) <-
+     (given ps
+            (lambda-expr x)))
+```
+
+First, we replaced `v` (variable) with `ps` (params). The name change itself
+doesn't do anything. These are just names. The important part is that we
+replaced `(fact (lambda-expr v))` with just `ps` in the `given` condition. This
+means that now we define `[:params the-params...]` instead of the fact that `v`
+is an expression.
+
+This by itself is not enough.
+
+```sh
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-4-3.md 
+# ...
+lambda-spec-4-3.md:112: Error: No rules are defined to translate statement [:params x] and therefore it does not have any meaning
+lambda-spec-4-3.md:112: Note: [:params example/x]
+lambda-spec-4-3.md:85: Error: No rules are defined to translate statement [:params x] and therefore it does not have any meaning
+lambda-spec-4-3.md:85: Note: [:params example/x]
+lambda-spec-4-3.md:73: Error: No rules are defined to translate statement [:params f] and therefore it does not have any meaning
+lambda-spec-4-3.md:73: Note: [:params example/f]
+lambda-spec-4-3.md:64: Error: No rules are defined to translate statement [:params m] and therefore it does not have any meaning
+lambda-spec-4-3.md:64: Note: [:params example/m]
+lambda-spec-4-3.md:55: Error: The wrong error was reported: No rules are defined to translate statement [:params f] and therefore it does not have any meaning
+lambda-spec-4-3.md:55: Note: [:params example/f]
+lambda-spec-4-3.md:46: Error: The wrong error was reported: No rules are defined to translate statement [:params f] and therefore it does not have any meaning
+lambda-spec-4-3.md:46: Note: [:params example/f]
+lambda-spec-4-3.md:37: Error: No rules are defined to translate statement [:params f] and therefore it does not have any meaning
+lambda-spec-4-3.md:37: Note: [:params example/f]
+lambda-spec-4-3.md:28: Error: The wrong error was reported: No rules are defined to translate statement [:params x] and therefore it does not have any meaning
+lambda-spec-4-3.md:28: Note: [:params example/x]
+lambda-spec-4-3.md:19: Error: No rules are defined to translate statement [:params x] and therefore it does not have any meaning
+lambda-spec-4-3.md:19: Note: [:params example/x]
+9 Failed but 1 succeeded
+```
+
+Many errors, but they all say the same thing. We did not provide a translation
+for `:params`.
+
+Let's do this.
+
+```clojure
+(all [p ps]
+     [:params p & ps] =>)
+```
+
+This rule matches a `:params` block with one or more parameters (and we know
+this is the case because we used `+` in the grammar) and binds the first to `p`
+and the rest to `ps`. This translation rule doesn't (yet) translate to aything,
+but this is enough to get rid of the `No rules are defined to translate
+statement ...` errors.
+
+```sh
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-4-3.md 
+# ...
+lambda-spec-4-3.md:112: Error: x is not a valid lambda expression in [:definition id [:expr ...]]
+lambda-spec-4-3.md:111: Note: [:definition example/id [:expr [:lambda_abst [:params example/x] [:expr example/x]]]]
+lambda-spec-4-3.md:85: Error: x is not a valid lambda expression in [:definition id [:expr ...]]
+lambda-spec-4-3.md:84: Note: [:definition example/id [:expr [:lambda_abst [:params example/x] [:expr example/x]]]]
+lambda-spec-4-3.md:73: Error: x is not a valid lambda expression in [:definition zero [:expr ...]]
+lambda-spec-4-3.md:73: Note: [:definition example/zero [:expr [:lambda_abst [:params example/f] [:expr [:lambda_abst [:params example/x] [:expr example/x]]]]]]
+lambda-spec-4-3.md:64: Error: m is not a valid lambda expression in [:definition PLUS [:expr ...]]
+lambda-spec-4-3.md:64: Note: [:definition example/PLUS [:expr [:lambda_abst [:params example/m] [:expr [:lambda_abst [:params example/n] [:expr [:lambda_abst [:params example/f] [:expr [:lambda_abst [:params example/x] [:expr [:func_application [:func_application example/m example/f] [:expr [:func_application [:func_application example/n example/f] example/x]]]]]]]]]]]]]
+lambda-spec-4-3.md:55: Error: The wrong error was reported: f is not a valid lambda expression in [:definition one [:expr ...]]
+lambda-spec-4-3.md:55: Note: [:definition example/one [:expr [:lambda_abst [:params example/f] [:expr [:lambda_abst [:params example/x] [:expr [:func_application example/f example/x1]]]]]]]
+lambda-spec-4-3.md:37: Error: f is not a valid lambda expression in [:definition one [:expr ...]]
+lambda-spec-4-3.md:37: Note: [:definition example/one [:expr [:lambda_abst [:params example/f] [:expr [:lambda_abst [:params example/x] [:expr [:func_application example/f example/x]]]]]]]
+lambda-spec-4-3.md:19: Error: x is not a valid lambda expression in [:definition id [:expr ...]]
+lambda-spec-4-3.md:19: Note: [:definition example/id [:expr [:lambda_abst [:params example/x] [:expr example/x]]]]
+7 Failed but 3 succeeded
+```
+
+Now the errors indicate that the parameters are never defined as expressions.
+
+We can fix this.
+
+```clojure
+(all [p ps]
+     [:params p & ps] =>
+     (fact (lambda-expr p)))
+```
+
+We introduce the first parameter as an expression.
+
+This works for all but the new example.
+
+```sh
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-4-3.md 
+# ...
+lambda-spec-4-3.md:115: Error: x is not a valid lambda expression in [:definition zero [:expr ...]]
+lambda-spec-4-3.md:112: Note: [:definition example/zero [:expr [:lambda_abst [:params example/f example/x] [:expr example/x]]]]
+1 Failed but 9 succeeded
+```
+
+Now, to solve the last case, we need to recurse to the other parameters.
+
+```clojure
+(all [p ps]
+     [:params p & ps] =>
+     (fact (lambda-expr p))
+     [:params & ps])
+```
+
+Et voila!
+
+```sh
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-4-3.md 
+# ...
+10 Succeeded
+```
+
 ### Step 4 Complete
 
 At this point, your `lang-conf.edn` and `lambda.y0` files should look like the
@@ -941,10 +1185,10 @@ Success
 Obviously, we get a syntax error, because `public` is not part of our syntax.
 
 ```sh
-$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-5-1.md 
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-5-1.md
 # ...
-lambda-spec-5-1.md:111: Error: Syntax error
-1 Failed but 9 succeeded
+lambda-spec-5-1.md:138: Error: Syntax error
+1 Failed but 10 succeeded
 ```
 
 Let's fix this.
@@ -960,7 +1204,9 @@ Let's fix this.
             <app_expr> = func_application | arg_expr
             <arg_expr> = identifier | <'('> expr <')'>
 
-            lambda_abst = <'\\\\'> identifier <'.'> expr
+            lambda_abst = <'\\\\'> params <'.'> expr
+            params = identifier+
+
             func_application = app_expr arg_expr
             
             identifier = #'[a-zA-Z_][a-zA-Z_0-9]*'
@@ -976,11 +1222,11 @@ sequence of `def`s, not `definition`s. A `def` is either a `definition` or a
 Now our syntax error is replaced with a semantic one:
 
 ```sh
-$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-5-1.md 
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-5-1.md
 # ...
-lambda-spec-5-1.md:111: Error: No rules are defined to translate statement [:public_def [:definition ...]] and therefore it does not have any meaning
-lambda-spec-5-1.md:111: Note: [:public_def [:definition example/zero [:expr [:lambda_abst example/f [:expr [:lambda_abst example/x [:expr example/x]]]]]]]
-1 Failed but 9 succeeded
+lambda-spec-5-1.md:138: Error: No rules are defined to translate statement [:public_def [:definition ...]] and therefore it does not have any meaning
+lambda-spec-5-1.md:138: Note: [:public_def [:definition example/zero [:expr [:lambda_abst [:params example/f] [:expr [:lambda_abst [:params example/x] [:expr example/x]]]]]]]
+1 Failed but 10 succeeded
 ```
 
 We have already seen a similar error message, when we first introduced
@@ -1000,11 +1246,11 @@ x]]` (for any `v` and `x`) to... nothing so far.
 And it fails.
 
 ```sh
-$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-5-1.md 
+$ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-5-1.md
 # ...
-lambda-spec-5-1.md:113: Error: PLUS is not a valid lambda expression in [:definition MULT [:expr ...]]
-lambda-spec-5-1.md:112: Note: [:definition example/MULT [:expr [:lambda_abst example/m [:expr [:lambda_abst example/n [:expr [:func_application [:func_application example/m [:expr [:func_application example/PLUS example/n]]] example/zero]]]]]]]
-1 Failed but 9 succeeded
+lambda-spec-5-1.md:140: Error: PLUS is not a valid lambda expression in [:definition MULT [:expr ...]]
+lambda-spec-5-1.md:139: Note: [:definition example/MULT [:expr [:lambda_abst [:params example/m] [:expr [:lambda_abst [:params example/n] [:expr [:func_application [:func_application example/m [:expr [:func_application example/PLUS example/n]]] example/zero]]]]]]]
+1 Failed but 10 succeeded
 ```
 
 It fails, stating that `PLUS` is undefined. Why? Because a `public` definition
@@ -1024,7 +1270,7 @@ And it works.
 ```sh
 $ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-5-1.md 
 # ...
-10 Succeeded
+11 Succeeded
 ```
 
 ### The Import Statement
@@ -1055,8 +1301,9 @@ Obviously, we fail on a syntax error.
 
 ```sh
 $ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-5-2.md 
-lambda-spec-5-2.md:128: Error: Syntax error
-1 Failed but 10 succeeded
+# ...
+lambda-spec-5-2.md:157: Error: Syntax error
+1 Failed but 11 succeeded
 ```
 
 Let's add `import` to our grammar.
@@ -1075,7 +1322,9 @@ Let's add `import` to our grammar.
             <app_expr> = func_application | arg_expr
             <arg_expr> = identifier | <'('> expr <')'>
 
-            lambda_abst = <'\\\\'> identifier <'.'> expr
+            lambda_abst = <'\\\\'> params <'.'> expr
+            params = identifier+
+
             func_application = app_expr arg_expr
             
             identifier = #'[a-zA-Z_][a-zA-Z_0-9]*'
@@ -1106,9 +1355,9 @@ Now parsing succeeds, but `:import` has no meaning.
 ```sh
 $ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-5-2.md 
 # ...
-lambda-spec-5-2.md:128: Error: No rules are defined to translate statement [:import [:dep ...]] and therefore it does not have any meaning
-lambda-spec-5-2.md:128: Note: [:import [:dep example/some.module]]
-1 Failed but 10 succeeded
+lambda-spec-5-2.md:157: Error: No rules are defined to translate statement [:import [:dep ...]] and therefore it does not have any meaning
+lambda-spec-5-2.md:157: Note: [:import [:dep example/some.module]]
+1 Failed but 11 succeeded
 ```
 
 As before, we can fix this using an (initially empty) translation rule.
@@ -1124,9 +1373,9 @@ This changes the problem to a familiar one.
 ```sh
 $ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-5-2.md 
 # ...
-lambda-spec-5-2.md:130: Error: PLUS is not a valid lambda expression in [:definition MULT [:expr ...]]
-lambda-spec-5-2.md:128: Note: [:definition example/MULT [:expr [:lambda_abst example/m [:expr [:lambda_abst example/n [:expr [:func_application [:func_application example/m [:expr [:func_application example/PLUS example/n]]] example/zero]]]]]]]
-1 Failed but 10 succeeded
+lambda-spec-5-2.md:159: Error: PLUS is not a valid lambda expression in [:definition MULT [:expr ...]]
+lambda-spec-5-2.md:157: Note: [:definition example/MULT [:expr [:lambda_abst [:params example/m] [:expr [:lambda_abst [:params example/n] [:expr [:func_application [:func_application example/m [:expr [:func_application example/PLUS example/n]]] example/zero]]]]]]]
+1 Failed but 11 succeeded
 ```
 
 ### Exports and Imports
@@ -1180,7 +1429,7 @@ This does the trick.
 ```sh
 $ java -jar y0.jar -c lang-conf.edn -p . -s lambda-spec-5-2.md 
 # ...
-11 Succeeded
+12 Succeeded
 ```
 
 ### Step 5 Complete

@@ -12,10 +12,15 @@
      (lambda-expr [:expr x]) <-
      (lambda-expr x))
 
-(all [v x]
-     (lambda-expr [:lambda_abst v x]) <-
-     (given (fact (lambda-expr v))
+(all [ps x]
+     (lambda-expr [:lambda_abst ps x]) <-
+     (given ps
             (lambda-expr x)))
+
+(all [p ps]
+     [:params p & ps] =>
+     (fact (lambda-expr p))
+     [:params & ps])
 
 (all [f x]
      (lambda-expr [:func_application f x]) <-

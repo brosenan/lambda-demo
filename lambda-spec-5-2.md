@@ -105,6 +105,33 @@ IFTHENELSE = \p.\a.\b.p a b;
 Success
 ```
 
+## Step 4.3
+
+```haskell
+-- The identity function
+id = \x. x;
+
+-- Church Numerals
+zero = \f x.x;
+one = \f x.f x;
+two = \f x.f (f x);
+
+-- Arithmetic
+PLUS = \m n f x.m f (n f x);
+MULT = \m n.m (PLUS n) zero;
+
+-- Logic
+TRUE = \x y.x;
+FALSE = \x y.y;
+AND = \p q.p q p;
+OR = \p q.p p q;
+NOT = \p.p FALSE TRUE;
+IFTHENELSE = \p a b.p a b;
+```
+```status
+Success
+```
+
 ## Step 5.1
 
 ```haskell
